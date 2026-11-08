@@ -1177,3 +1177,752 @@ player.CharacterAdded:Connect(function()
 end)
 
 notify("X HUB Mobile", "Menu Armenta carregado!", "Success")
+--==================================================
+-- PARTE 5 — STEAL A BRAINROT PANEL
+--==================================================
+
+local STEAL_IMG = "rbxassetid://114811151703165"
+local EMOTE_ID = "rbxassetid://113994067684875"
+
+local stealOld = playerGui:FindFirstChild("StealBrainrotPanel")
+if stealOld then stealOld:Destroy() end
+
+local stealGui = Instance.new("ScreenGui")
+stealGui.Name = "StealBrainrotPanel"
+stealGui.ResetOnSpawn = false
+stealGui.IgnoreGuiInset = true
+stealGui.DisplayOrder = 999
+stealGui.Parent = playerGui
+
+local floating = Instance.new("ImageButton")
+floating.Name = "FloatingButton"
+floating.Size = UDim2.fromOffset(56, 56)
+floating.Position = UDim2.new(0, 16, 0.5, -28)
+floating.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+floating.Image = STEAL_IMG
+floating.ScaleType = Enum.ScaleType.Fit
+floating.AutoButtonColor = false
+floating.ZIndex = 100
+floating.Parent = stealGui
+Instance.new("UICorner", floating).CornerRadius = UDim.new(1, 0)
+local fSt = Instance.new("UIStroke")
+fSt.Color = Color3.fromRGB(255, 0, 0); fSt.Thickness = 3; fSt.Parent = floating
+
+local stealPanel = Instance.new("Frame")
+stealPanel.Name = "Panel"
+stealPanel.Size = UDim2.fromOffset(270, 320)
+stealPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+stealPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+stealPanel.BackgroundColor3 = Color3.fromRGB(12, 0, 0)
+stealPanel.BorderSizePixel = 0
+stealPanel.Visible = false
+stealPanel.ClipsDescendants = true
+stealPanel.ZIndex = 10
+stealPanel.Parent = stealGui
+Instance.new("UICorner", stealPanel).CornerRadius = UDim.new(0, 12)
+local pSt = Instance.new("UIStroke")
+pSt.Color = Color3.fromRGB(255, 0, 0); pSt.Thickness = 2; pSt.Parent = stealPanel
+
+-- Beams animados
+local beamLayer = Instance.new("Frame")
+beamLayer.Size = UDim2.fromScale(1, 1)
+beamLayer.BackgroundTransparency = 1
+beamLayer.ZIndex = 11
+beamLayer.Parent = stealPanel
+
+local function createBeam(rot, trans)
+    local b = Instance.new("Frame")
+    b.Size = UDim2.fromScale(1, 1)
+    b.BackgroundColor3 = Color3.fromRGB(255, 20, 20)
+    b.BackgroundTransparency = trans
+    b.BorderSizePixel = 0
+    b.ZIndex = 11
+    b.Parent = beamLayer
+    local g = Instance.new("UIGradient")
+    g.Rotation = rot
+    g.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 0, 0)),
+        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 220, 220)),
+        ColorSequenceKeypoint.new(0.65, Color3.fromRGB(255, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 0, 0)),
+    })
+    g.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 0),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    g.Parent = b
+    task.spawn(function()
+        while b.Parent do
+            local t = TweenService:Create(g, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Offset = Vector2.new(0.8, 0)})
+            t:Play(); t.Completed:Wait()
+            if not b.Parent then break end
+            local t2 = TweenService:Create(g, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Offset = Vector2.new(-0.8, 0)})
+            t2:Play(); t2.Completed:Wait()
+        end
+    end)
+end
+createBeam(35, 0.72); createBeam(145, 0.82); createBeam(90, 0.88)
+
+-- Header
+local sHeader = Instance.new("Frame")
+sHeader.Size = UDim2.new(1, 0, 0, 36)
+sHeader.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+sHeader.BorderSizePixel = 0
+sHeader.ZIndex = 20
+sHeader.Active = true
+sHeader.Parent = stealPanel
+Instance.new("UICorner", sHeader).CornerRadius = UDim.new(0, 12)
+local sTitle = Instance.new("TextLabel")
+sTitle.Size = UDim2.new(1, -12, 1, 0)
+sTitle.Position = UDim2.fromOffset(10, 0)
+sTitle.BackgroundTransparency = 1
+sTitle.Text = "STEAL A BRAINROT"
+sTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+sTitle.Font = Enum.Font.GothamBlack
+sTitle.TextSize = 13
+sTitle.TextXAlignment = Enum.TextXAlignment.Left
+sTitle.ZIndex = 21
+sTitle.Parent = sHeader
+
+-- Content
+local sContent = Instance.new("Frame")
+sContent.Size = UDim2.new(1, -20, 1, -48)
+sContent.Position = UDim2.fromOffset(10, 42)
+sContent.BackgroundTransparency = 1
+sContent.ZIndex = 20
+sContent.Parent = stealPanel
+local sLayout = Instance.new("UIListLayout")
+sLayout.Padding = UDim.new(0, 8)
+sLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sLayout.Parent = sContent
+
+local sStatus = Instance.new("TextLabel")
+sStatus.Size = UDim2.new(1, 0, 0, 20)
+sStatus.BackgroundTransparency = 1
+sStatus.Text = "SELECIONE UMA OPCAO"
+sStatus.TextColor3 = Color3.fromRGB(255, 200, 200)
+sStatus.Font = Enum.Font.GothamBold
+sStatus.TextSize = 10
+sStatus.LayoutOrder = 1
+sStatus.ZIndex = 22
+sStatus.Parent = sContent
+
+local function setSStatus(txt, color)
+    sStatus.Text = txt
+    sStatus.TextColor3 = color or Color3.fromRGB(255, 200, 200)
+end
+
+-- Lógica emote / deitar
+local emoteTrack
+local rootJointOriginalC0, neckOriginalC0, humanoidOriginalHipHeight
+local function getCharHum()
+    local c = player.Character
+    if not c then return nil end
+    return c, c:FindFirstChildOfClass("Humanoid")
+end
+local function getRootJoint(c) local hrp = c:FindFirstChild("HumanoidRootPart"); return hrp and hrp:FindFirstChild("RootJoint") end
+local function getNeck(c) local t = c:FindFirstChild("UpperTorso") or c:FindFirstChild("Torso"); return t and t:FindFirstChild("Neck") end
+local function startEmote()
+    local c, h = getCharHum(); if not c or not h then return end
+    if emoteTrack then emoteTrack:Stop() end
+    local anim = Instance.new("Animation")
+    anim.AnimationId = EMOTE_ID
+    emoteTrack = h:LoadAnimation(anim)
+    emoteTrack.Looped = true
+    emoteTrack.Priority = Enum.AnimationPriority.Action
+    emoteTrack:Play()
+end
+local function stopEmote() if emoteTrack then emoteTrack:Stop(); emoteTrack = nil end end
+local function deitar()
+    local c, h = getCharHum(); if not c or not h then return end
+    local rj = getRootJoint(c)
+    if rj then
+        if not rootJointOriginalC0 then rootJointOriginalC0 = rj.C0 end
+        rj.C0 = rootJointOriginalC0 * CFrame.Angles(math.rad(-90), 0, 0)
+    end
+    local nk = getNeck(c)
+    if nk then
+        if not neckOriginalC0 then neckOriginalC0 = nk.C0 end
+        nk.C0 = neckOriginalC0 * CFrame.Angles(math.rad(-20), 0, 0)
+    end
+    if humanoidOriginalHipHeight == nil then humanoidOriginalHipHeight = h.HipHeight end
+    h.HipHeight = humanoidOriginalHipHeight - 2
+end
+local function voltarNormal()
+    local c, h = getCharHum(); if not c or not h then return end
+    local rj = getRootJoint(c)
+    if rj and rootJointOriginalC0 then
+        TweenService:Create(rj, TweenInfo.new(0.3), {C0 = rootJointOriginalC0}):Play()
+    end
+    local nk = getNeck(c)
+    if nk and neckOriginalC0 then
+        TweenService:Create(nk, TweenInfo.new(0.3), {C0 = neckOriginalC0}):Play()
+    end
+    if humanoidOriginalHipHeight then h.HipHeight = humanoidOriginalHipHeight; humanoidOriginalHipHeight = nil end
+end
+
+-- Toggle creator
+local emoteRef, deitarRef, autoStealRef
+local function createToggle(text, order, onToggle)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 44)
+    btn.BackgroundColor3 = Color3.fromRGB(55, 0, 0)
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order
+    btn.ZIndex = 22
+    btn.Parent = sContent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    local st = Instance.new("UIStroke"); st.Color = Color3.fromRGB(255, 20, 20); st.Thickness = 1.5; st.Parent = btn
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.fromOffset(12, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.new(1,1,1)
+    lbl.Font = Enum.Font.GothamBlack
+    lbl.TextSize = 12
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 23
+    lbl.Parent = btn
+    local track = Instance.new("Frame")
+    track.Size = UDim2.fromOffset(52, 26)
+    track.Position = UDim2.new(1, -62, 0.5, -13)
+    track.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    track.BorderSizePixel = 0
+    track.ZIndex = 23
+    track.Parent = btn
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+    local ball = Instance.new("Frame")
+    ball.Size = UDim2.fromOffset(22, 22)
+    ball.Position = UDim2.fromOffset(2, 2)
+    ball.BackgroundColor3 = Color3.fromRGB(140, 0, 0)
+    ball.BorderSizePixel = 0
+    ball.ZIndex = 24
+    ball.Parent = track
+    Instance.new("UICorner", ball).CornerRadius = UDim.new(1, 0)
+    local isOn = false
+    local function applyV(v)
+        if v then
+            TweenService:Create(ball, TweenInfo.new(0.28, Enum.EasingStyle.Back), {Position = UDim2.fromOffset(28, 2), BackgroundColor3 = Color3.fromRGB(0, 220, 100), Size = UDim2.fromOffset(24, 24)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(15, 70, 25)}):Play()
+            TweenService:Create(st, TweenInfo.new(0.25), {Color = Color3.fromRGB(0, 255, 100)}):Play()
+        else
+            TweenService:Create(ball, TweenInfo.new(0.28, Enum.EasingStyle.Back), {Position = UDim2.fromOffset(2, 2), BackgroundColor3 = Color3.fromRGB(140, 0, 0), Size = UDim2.fromOffset(22, 22)}):Play()
+            TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(55, 0, 0)}):Play()
+            TweenService:Create(st, TweenInfo.new(0.25), {Color = Color3.fromRGB(255, 20, 20)}):Play()
+        end
+    end
+    local function set(v)
+        if isOn == v then return end
+        isOn = v
+        applyV(v)
+        if onToggle then onToggle(v) end
+    end
+    btn.Activated:Connect(function() set(not isOn) end)
+    return {set = set, reset = function() isOn = false; applyV(false) end, isActive = function() return isOn end}
+end
+
+emoteRef = createToggle("ATIVAR EMOTE", 2, function(a)
+    if a then startEmote(); setSStatus("EMOTE ATIVADO", Color3.fromRGB(100, 255, 130))
+    else stopEmote(); setSStatus("EMOTE OFF") end
+end)
+deitarRef = createToggle("DEITAR P/ BAIXO", 3, function(a)
+    if a then deitar(); setSStatus("DEITADO", Color3.fromRGB(100, 255, 130))
+    else voltarNormal(); setSStatus("EM PE") end
+end)
+autoStealRef = createToggle("AUTO STEAL", 4, function(a)
+    if a then startEmote(); setSStatus("AUTO STEAL ON", Color3.fromRGB(100, 255, 130))
+    else stopEmote(); setSStatus("AUTO STEAL OFF") end
+end)
+
+-- Discord
+local dBtn = Instance.new("TextButton")
+dBtn.Size = UDim2.new(1, 0, 0, 44)
+dBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+dBtn.BorderSizePixel = 0
+dBtn.Text = "COPIAR DISCORD"
+dBtn.TextColor3 = Color3.new(1,1,1)
+dBtn.Font = Enum.Font.GothamBlack
+dBtn.TextSize = 13
+dBtn.AutoButtonColor = false
+dBtn.LayoutOrder = 5
+dBtn.ZIndex = 22
+dBtn.Parent = sContent
+Instance.new("UICorner", dBtn).CornerRadius = UDim.new(0, 8)
+dBtn.Activated:Connect(function()
+    if typeof(setclipboard) == "function" then
+        pcall(function() setclipboard(DISCORD_URL) end)
+        setSStatus("DISCORD COPIADO!", Color3.fromRGB(100, 255, 130))
+    else
+        setSStatus("CLIPBOARD INDISPONIVEL", Color3.fromRGB(255, 150, 100))
+    end
+end)
+
+-- Loops
+RunService.Heartbeat:Connect(function()
+    local emoteOn = (emoteRef and emoteRef.isActive()) or (autoStealRef and autoStealRef.isActive())
+    if emoteOn and (not emoteTrack or not emoteTrack.IsPlaying) then
+        local c, h = getCharHum(); if c and h then startEmote() end
+    end
+    if deitarRef and deitarRef.isActive() then
+        local c, h = getCharHum(); if c and h then
+            local rj = getRootJoint(c)
+            if rj and rootJointOriginalC0 then rj.C0 = rootJointOriginalC0 * CFrame.Angles(math.rad(-90), 0, 0) end
+            if humanoidOriginalHipHeight then h.HipHeight = humanoidOriginalHipHeight - 2 end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if autoStealRef and autoStealRef.isActive() then
+        local c = player.Character
+        if c then
+            for _, v in ipairs(c:GetDescendants()) do
+                if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+            end
+        end
+    end
+end)
+
+-- Drag
+local function draggable(obj, handle, click)
+    local dragging, moved, startPos, startInput, dragInput
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; moved = false; startInput = input.Position; startPos = obj.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    if not moved and click then click() end
+                end
+            end)
+        end
+    end)
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+        or input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local d = input.Position - startInput
+            if math.abs(d.X) > 5 or math.abs(d.Y) > 5 then moved = true end
+            obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        end
+    end)
+end
+
+-- Open/Close
+local sOpened = false
+local function toggleSPanel()
+    sOpened = not sOpened
+    if sOpened then
+        stealPanel.Visible = true
+        stealPanel.Size = UDim2.fromOffset(210, 260)
+        TweenService:Create(stealPanel, TweenInfo.new(0.28, Enum.EasingStyle.Back), {Size = UDim2.fromOffset(270, 320)}):Play()
+    else
+        stealPanel.Visible = false
+    end
+end
+
+draggable(floating, floating, toggleSPanel)
+draggable(stealPanel, sHeader)
+
+player.CharacterAdded:Connect(function()
+    emoteTrack = nil; rootJointOriginalC0 = nil; neckOriginalC0 = nil; humanoidOriginalHipHeight = nil
+    if emoteRef then emoteRef.reset() end
+    if deitarRef then deitarRef.reset() end
+    if autoStealRef then autoStealRef.reset() end
+    setSStatus("SELECIONE UMA OPCAO")
+end)
+
+getgenv().StealBrainrotPanel = {
+    Open = function()
+        if not sOpened then toggleSPanel() end
+    end,
+    Close = function()
+        if sOpened then toggleSPanel() end
+    end,
+    Toggle = toggleSPanel,
+}
+--==================================================
+-- PARTE 6 — PVP DRAGPANEL
+--==================================================
+
+local pvpOld = playerGui:FindFirstChild("XHubPvPPanelGui")
+if pvpOld then pvpOld:Destroy() end
+
+local LOGO_ID = "rbxassetid://114811151703165"
+local PAD, GAP = 6, 6
+local HEADER_H, LOCK_H, BTN, CORNER = 40, 28, 52, 18
+local PANEL_W = PAD*2 + BTN*2 + GAP
+local Y_H = PAD
+local Y_L = Y_H + HEADER_H + 4
+local Y_R1 = Y_L + LOCK_H + GAP
+local Y_R2 = Y_R1 + BTN + GAP
+local Y_R3 = Y_R2 + BTN + GAP
+local Y_R4 = Y_R3 + BTN + GAP
+local PANEL_H = Y_R4 + BTN + PAD
+local X_C1 = PAD
+local X_C2 = PAD + BTN + GAP
+
+local btnsData = {
+    { name = "BatAura",     label = "Aura",     x = X_C1, y = Y_R1 },
+    { name = "AutoBat",     label = "AutoBat",  x = X_C2, y = Y_R1 },
+    { name = "SpeedCarry",  label = "Carry 29", x = X_C1, y = Y_R2 },
+    { name = "NormalSpeed", label = "Speed 59", x = X_C2, y = Y_R2 },
+    { name = "ESP",         label = "ESP",      x = X_C1, y = Y_R3 },
+    { name = "AutoSteal",   label = "Steal",    x = X_C2, y = Y_R3 },
+    { name = "InfJump",     label = "InfJump",  x = X_C1, y = Y_R4 },
+    { name = "AntiLag",     label = "AntiLag",  x = X_C2, y = Y_R4 },
+}
+
+local pvpSg = Instance.new("ScreenGui")
+pvpSg.Name = "XHubPvPPanelGui"
+pvpSg.ResetOnSpawn = false
+pvpSg.IgnoreGuiInset = true
+pvpSg.DisplayOrder = 999
+pvpSg.Parent = playerGui
+
+local pvpPanel = Instance.new("CanvasGroup")
+pvpPanel.Size = UDim2.fromOffset(PANEL_W, PANEL_H)
+pvpPanel.BackgroundTransparency = 1
+pvpPanel.BorderSizePixel = 0
+pvpPanel.ClipsDescendants = true
+pvpPanel.Visible = false
+pvpPanel.Parent = pvpSg
+
+local cam = workspace.CurrentCamera
+local vp = cam and cam.ViewportSize or Vector2.new(1080, 1920)
+pvpPanel.Position = UDim2.fromOffset(vp.X - PANEL_W - 8, (vp.Y - PANEL_H) / 2)
+
+local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0, CORNER); pc.Parent = pvpPanel
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.fromScale(1, 1)
+bg.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bg.BorderSizePixel = 0
+bg.ZIndex = 1
+bg.Parent = pvpPanel
+
+local bgg = Instance.new("UIGradient")
+bgg.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 32, 52)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(12, 16, 26)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 32, 52)),
+})
+bgg.Rotation = 45
+bgg.Parent = bg
+
+-- Beams
+local function beamC()
+    local b = { Color3.fromRGB(0,200,255), Color3.fromRGB(140,80,255), Color3.fromRGB(255,80,180), Color3.fromRGB(80,255,190), Color3.fromRGB(255,210,100) }
+    local n = #b; local t = n*3; local k = {}
+    for i = 0, t do k[#k+1] = ColorSequenceKeypoint.new(i/t, b[(i%n)+1]) end
+    return ColorSequence.new(k)
+end
+local function beamA()
+    local c = {1/6, 3/6, 5/6}; local hw = 0.06
+    local pts = {{0,1},{1,1}}
+    for _,cc in ipairs(c) do
+        table.insert(pts,{cc-hw,1}); table.insert(pts,{cc-hw*.5,.35})
+        table.insert(pts,{cc,0}); table.insert(pts,{cc+hw*.5,.35})
+        table.insert(pts,{cc+hw,1})
+    end
+    table.sort(pts, function(a,b) return a[1]<b[1] end)
+    local k, p = {}, -1
+    for _,q in ipairs(pts) do
+        local t = math.clamp(q[1],0,1)
+        if t-p > 0.001 then k[#k+1] = NumberSequenceKeypoint.new(t,q[2]); p=t end
+    end
+    return NumberSequence.new(k)
+end
+
+local beams = Instance.new("Frame")
+beams.Size = UDim2.fromScale(1, 1)
+beams.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+beams.BorderSizePixel = 0
+beams.ZIndex = 1
+beams.Parent = pvpPanel
+
+local bgd = Instance.new("UIGradient")
+bgd.Color = beamC()
+bgd.Transparency = beamA()
+bgd.Rotation = -25
+bgd.Parent = beams
+
+TweenService:Create(bgd, TweenInfo.new(2.5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Offset = Vector2.new(1, 0)}):Play()
+
+local ov = Instance.new("Frame")
+ov.Size = UDim2.fromScale(1, 1)
+ov.BackgroundColor3 = Color3.fromRGB(10, 14, 24)
+ov.BackgroundTransparency = 0.35
+ov.BorderSizePixel = 0
+ov.ZIndex = 2
+ov.Parent = pvpPanel
+
+local pvpStroke = Instance.new("UIStroke")
+pvpStroke.Color = Color3.fromRGB(120, 155, 230)
+pvpStroke.Transparency = 0.45
+pvpStroke.Thickness = 1.2
+pvpStroke.Parent = pvpPanel
+
+local hHeader = Instance.new("Frame")
+hHeader.Size = UDim2.new(1, -PAD*2, 0, HEADER_H)
+hHeader.Position = UDim2.fromOffset(PAD, Y_H)
+hHeader.BackgroundTransparency = 1
+hHeader.Active = true
+hHeader.ZIndex = 3
+hHeader.Parent = pvpPanel
+
+local hBg = Instance.new("Frame")
+hBg.Size = UDim2.fromScale(1, 1)
+hBg.BackgroundColor3 = Color3.fromRGB(45, 55, 85)
+hBg.BackgroundTransparency = 0.4
+hBg.BorderSizePixel = 0
+hBg.ZIndex = 2
+hBg.Parent = hHeader
+local hc = Instance.new("UICorner"); hc.CornerRadius = UDim.new(0, 12); hc.Parent = hBg
+
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.fromOffset(28, 28)
+logo.Position = UDim2.fromOffset(5, (HEADER_H-28)/2)
+logo.BackgroundColor3 = Color3.fromRGB(30, 38, 58)
+logo.BorderSizePixel = 0
+logo.Image = LOGO_ID
+logo.ScaleType = Enum.ScaleType.Crop
+logo.ZIndex = 4
+logo.Parent = hHeader
+local lc = Instance.new("UICorner"); lc.CornerRadius = UDim.new(0, 8); lc.Parent = logo
+
+local hTitle = Instance.new("TextLabel")
+hTitle.Size = UDim2.new(1, -40, 1, 0)
+hTitle.Position = UDim2.fromOffset(38, 0)
+hTitle.BackgroundTransparency = 1
+hTitle.Text = "X Hub"
+hTitle.Font = Enum.Font.GothamBold
+hTitle.TextSize = 15
+hTitle.TextColor3 = Color3.fromRGB(245, 250, 255)
+hTitle.TextXAlignment = Enum.TextXAlignment.Left
+hTitle.ZIndex = 4
+hTitle.Parent = hHeader
+
+local lockBtn = Instance.new("TextButton")
+lockBtn.Size = UDim2.fromOffset(PANEL_W-PAD*2, LOCK_H)
+lockBtn.Position = UDim2.fromOffset(PAD, Y_L)
+lockBtn.BackgroundColor3 = Color3.fromRGB(35, 42, 62)
+lockBtn.BorderSizePixel = 0
+lockBtn.Text = "MOVER"
+lockBtn.TextColor3 = Color3.fromRGB(230, 240, 255)
+lockBtn.Font = Enum.Font.GothamBold
+lockBtn.TextSize = 12
+lockBtn.AutoButtonColor = false
+lockBtn.ZIndex = 3
+lockBtn.Parent = pvpPanel
+Instance.new("UICorner", lockBtn).CornerRadius = UDim.new(0, 12)
+
+local pLocked, pStates, pCallbacks, pButtons = false, {}, {}, {}
+
+for _, d in ipairs(btnsData) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.fromOffset(BTN, BTN)
+    btn.Position = UDim2.fromOffset(d.x, d.y)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 42, 62)
+    btn.BackgroundTransparency = 0.15
+    btn.BorderSizePixel = 0
+    btn.Text = d.label
+    btn.TextColor3 = Color3.fromRGB(215, 228, 250)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextScaled = true
+    btn.AutoButtonColor = false
+    btn.ZIndex = 3
+    btn.Parent = pvpPanel
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 14)
+    local st = Instance.new("UIStroke"); st.Color = Color3.fromRGB(120, 150, 220); st.Transparency = 0.65; st.Thickness = 1; st.Parent = btn
+    pButtons[d.name] = btn
+    pStates[d.name] = false
+end
+
+local function pAnimate(btn, isOn)
+    local st = btn:FindFirstChildOfClass("UIStroke")
+    local corner = btn:FindFirstChildOfClass("UICorner")
+    if isOn then
+        TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(79, 140, 255), BackgroundTransparency = 0, TextColor3 = Color3.new(1,1,1)}):Play()
+        if st then TweenService:Create(st, TweenInfo.new(0.25), {Color = Color3.fromRGB(180, 210, 255), Transparency = 0.05, Thickness = 1.5}):Play() end
+        if corner then TweenService:Create(corner, TweenInfo.new(0.35, Enum.EasingStyle.Back), {CornerRadius = UDim.new(1, 0)}):Play() end
+    else
+        TweenService:Create(btn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(35, 42, 62), BackgroundTransparency = 0.15, TextColor3 = Color3.fromRGB(215, 228, 250)}):Play()
+        if st then TweenService:Create(st, TweenInfo.new(0.25), {Color = Color3.fromRGB(120, 150, 220), Transparency = 0.65, Thickness = 1}):Play() end
+        if corner then TweenService:Create(corner, TweenInfo.new(0.3), {CornerRadius = UDim.new(0, 14)}):Play() end
+    end
+end
+
+local function pSetState(name, value, silent)
+    local btn = pButtons[name]
+    if not btn then return end
+    if pStates[name] == value then return end
+    pStates[name] = value
+    if not silent then pAnimate(btn, value) end
+    local cb = pCallbacks[name]
+    if cb and not silent then
+        local fn = value and cb.on or cb.off
+        if fn then pcall(fn) end
+    end
+end
+
+for name, btn in pairs(pButtons) do
+    btn.Activated:Connect(function() pSetState(name, not pStates[name]) end)
+end
+
+local function pUpdateLock()
+    if pLocked then
+        lockBtn.Text = "TRAVADO"
+        TweenService:Create(lockBtn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(180, 60, 60)}):Play()
+    else
+        lockBtn.Text = "MOVER"
+        TweenService:Create(lockBtn, TweenInfo.new(0.25), {BackgroundColor3 = Color3.fromRGB(35, 42, 62)}):Play()
+    end
+end
+lockBtn.Activated:Connect(function() pLocked = not pLocked; pUpdateLock() end)
+pUpdateLock()
+
+-- Drag
+local pDragging, pStart, pPos
+hHeader.InputBegan:Connect(function(input)
+    if pLocked then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        pDragging = true; pStart = input.Position; pPos = pvpPanel.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if not pDragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
+        local d = input.Position - pStart
+        pvpPanel.Position = UDim2.fromOffset(pPos.X.Offset + d.X, pPos.Y.Offset + d.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if not pDragging then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        pDragging = false
+    end
+end)
+
+-- API
+local pvpApi = {}
+function pvpApi:On(n, onFn, offFn) pCallbacks[n] = {on = onFn, off = offFn} end
+function pvpApi:Set(n, v) pSetState(n, v == true) end
+function pvpApi:SetSilent(n, v) pSetState(n, v == true, true) end
+function pvpApi:Get(n) return pStates[n] == true end
+function pvpApi:Lock() pLocked = true; pUpdateLock() end
+function pvpApi:Unlock() pLocked = false; pUpdateLock() end
+function pvpApi:SetVisible(v) pvpPanel.Visible = v == true end
+getgenv().XHubPvPPanel = pvpApi
+
+-- Wire callbacks (usa funções do main script)
+pvpApi:On("BatAura",
+    function() if not auraEnabled then startAura() end end,
+    function() if auraEnabled then stopAura() end end
+)
+pvpApi:On("AutoBat",
+    function()
+        autoBatEnabled = true; autoBatToken += 1
+        local t = autoBatToken
+        task.spawn(function()
+            while autoBatEnabled and autoBatToken == t do
+                local c, h = getCC(); local b = getBat()
+                if c and h and h.Health > 0 and b then
+                    if b.Parent ~= c then pcall(function() h:EquipTool(b) end) end
+                    if b.Parent == c then pcall(function() b:Activate() end) end
+                end
+                task.wait(BAT_INTERVAL)
+            end
+        end)
+    end,
+    function() autoBatEnabled = false; autoBatToken += 1 end
+)
+pvpApi:On("SpeedCarry",
+    function()
+        speedMode = CARRY_SPEED; setSpeed(CARRY_SPEED); applySpeedEffects()
+        pvpApi:SetSilent("NormalSpeed", false)
+    end,
+    function() if speedMode == CARRY_SPEED then speedMode = nil; setSpeed(nil); applySpeedEffects() end end
+)
+pvpApi:On("NormalSpeed",
+    function()
+        speedMode = NORMAL_SPEED; setSpeed(NORMAL_SPEED); applySpeedEffects()
+        pvpApi:SetSilent("SpeedCarry", false)
+    end,
+    function() if speedMode == NORMAL_SPEED then speedMode = nil; setSpeed(nil); applySpeedEffects() end end
+)
+pvpApi:On("ESP",
+    function() if not espEnabled then setESP(true) end end,
+    function() if espEnabled then setESP(false) end end
+)
+pvpApi:On("AutoSteal",
+    function() if not autoStealEnabled then startAutoSteal() end end,
+    function() if autoStealEnabled then stopAutoSteal() end end
+)
+pvpApi:On("InfJump",
+    function() infiniteJumpEnabled = true end,
+    function() infiniteJumpEnabled = false end
+)
+pvpApi:On("AntiLag",
+    function() if not antiLagEnabled then applyAntiLag() end end,
+    function() if antiLagEnabled then removeAntiLag() end end
+)
+
+-- Botão flutuante pra abrir o painel
+local fb = Instance.new("TextButton")
+fb.Size = UDim2.fromOffset(52, 52)
+fb.Position = UDim2.new(1, -60, 0.5, -26)
+fb.BackgroundColor3 = Color3.fromRGB(35, 42, 62)
+fb.BorderSizePixel = 0
+fb.Text = "X"
+fb.TextColor3 = Color3.fromRGB(220, 235, 255)
+fb.Font = Enum.Font.GothamBold
+fb.TextSize = 20
+fb.AutoButtonColor = false
+fb.ZIndex = 950
+fb.Parent = pvpSg
+Instance.new("UICorner", fb).CornerRadius = UDim.new(1, 0)
+local fbs = Instance.new("UIStroke")
+fbs.Color = Color3.fromRGB(120, 170, 255); fbs.Transparency = 0.3; fbs.Thickness = 1.5; fbs.Parent = fb
+
+fb.Activated:Connect(function()
+    pvpPanel.Visible = not pvpPanel.Visible
+    fb.Text = pvpPanel.Visible and "×" or "X"
+end)
+
+-- Drag do botão
+local fbDrag, fbStart, fbPos
+fb.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        fbDrag = true; fbStart = input.Position; fbPos = fb.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if not fbDrag then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+    or input.UserInputType == Enum.UserInputType.Touch then
+        local d = input.Position - fbStart
+        fb.Position = UDim2.new(fbPos.X.Scale, fbPos.X.Offset + d.X, fbPos.Y.Scale, fbPos.Y.Offset + d.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if not fbDrag then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then fbDrag = false end
+end)
+
+print("[X HUB] Steal Brainrot + PvP Panel carregados ✔")
