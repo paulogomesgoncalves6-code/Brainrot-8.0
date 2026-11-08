@@ -1,0 +1,1179 @@
+--==================================================
+-- X HUB MOBILE | ARMENTA-LIB | PARTE 1
+--==================================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Splash intro
+task.spawn(function()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "XHubSplash"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.DisplayOrder = 9999
+    sg.Parent = playerGui
+
+    local img = Instance.new("ImageLabel")
+    img.AnchorPoint = Vector2.new(0.5, 0.5)
+    img.Position = UDim2.fromScale(0.5, 0.5)
+    img.Size = UDim2.fromOffset(80, 80)
+    img.BackgroundTransparency = 1
+    img.Image = "rbxassetid://114811151703165"
+    img.ImageTransparency = 1
+    img.Parent = sg
+
+    TweenService:Create(img,
+        TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        { ImageTransparency = 0, Size = UDim2.fromOffset(260, 260) }):Play()
+    task.wait(2.5)
+    TweenService:Create(img,
+        TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        { ImageTransparency = 1, Size = UDim2.fromOffset(100, 100) }):Play()
+    task.wait(0.7)
+    sg:Destroy()
+end)
+
+-- Load Armenta-Lib
+local ok, Armenta = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/Xyraniz/VaultUI/refs/heads/main/Libraries/Armenta-Lib/source.lua"
+    ))()
+end)
+if not ok or not Armenta then
+    warn("X HUB: falha ao carregar Armenta-Lib")
+    return
+end
+
+local Menu = Armenta.Menu({
+    Title = "X HUB Mobile",
+    Theme = "Crimson",
+    Size = UDim2.fromOffset(560, 460),
+    Resizable = true,
+    Shadow = true,
+    HasOutline = true,
+})
+
+-- Constants
+local DISCORD_URL = "https://discord.gg/DBZQ7pqwx"
+local MUSIC_ID = "rbxassetid://97825347303470"
+local AURA_SPEED = 60
+local FOLLOW_DIST = 4
+local BAT_INTERVAL = 0.6
+local JUMP_HEIGHT = 5
+local CARRY_SPEED = 29
+local NORMAL_SPEED = 59
+local LIFT_STUDS = 8
+local ESP_RAINBOW_SPEED = 0.35
+local ESP_DETECT_RANGE = 20
+
+-- State
+local currentSpeed = nil
+local floatEnabled, floatConn = false, nil
+local autoBatEnabled, autoBatToken = false, 0
+local auraEnabled, auraToken = false, 0
+local antiResetEnabled, antiResetConn = false, nil
+local antiLagEnabled = false
+local espEnabled = false
+local espObjects = {}
+local speedMode, liftPad, liftConn, slowAnimConn = nil, nil, nil, nil
+local infiniteJumpEnabled, jumpDebounce = false, false
+local antiRagdollEnabled, ragdollConn = false, nil
+local ragdollAnchor, ragdollPos, ragdollWas = nil, nil, false
+
+-- Helpers
+local function notify(title, content, notifType)
+    pcall(function()
+        Menu:Notify({ Title = title, Content = content, Type = notifType or "Info", Duration = 4 })
+    end)
+end
+
+local function getCC()
+    local c = player.Character
+    if not c then return nil, nil, nil end
+    return c, c:FindFirstChildOfClass("Humanoid"), c:FindFirstChild("HumanoidRootPart")
+end
+
+local function getBat()
+    local c = player.Character
+    local bp = player:FindFirstChildOfClass("Backpack")
+    local b = c and c:FindFirstChild("Bat")
+    if b and b:IsA("Tool") then return b end
+    b = bp and bp:FindFirstChild("Bat")
+    if b and b:IsA("Tool") then return b end
+    return nil
+end
+
+local function equipBat()
+    local c, h = getCC()
+    local b = getBat()
+    if c and h and b and b.Parent ~= c then
+        pcall(function() h:EquipTool(b) end)
+    end
+    return b
+end
+
+local function setSpeed(s)
+    currentSpeed = s
+    local _, h = getCC()
+    if h and not auraEnabled then h.WalkSpeed = s or 16 end
+end
+--==================================================
+-- PARTE 2 — ESP + ALERTA + MOVIMENTO + AURA
+--==================================================
+
+--==================================================
+-- ESP SYSTEM (linha + caixa + nome + rainbow)
+--==================================================
+local hasDrawing = false
+pcall(function()
+    local t = Drawing.new("Line"); t:Remove(); hasDrawing = true
+end)
+
+-- Alerta pequeno bonito + som real
+local alertGui = Instance.new("ScreenGui")
+alertGui.Name = "XHubAlert"
+alertGui.ResetOnSpawn = false
+alertGui.DisplayOrder = 998
+alertGui.Parent = playerGui
+
+local alertSound = Instance.new("Sound")
+alertSound.SoundId = "rbxassetid://5410086226"
+alertSound.Volume = 2
+alertSound.Parent = SoundService
+
+local lastAlert = 0
+local alertActive = false
+
+local function showAlert()
+    if alertActive or (os.clock() - lastAlert < 5) then return end
+    lastAlert = os.clock()
+    alertActive = true
+
+    local toast = Instance.new("Frame")
+    toast.Size = UDim2.fromOffset(200, 44)
+    toast.Position = UDim2.new(0.5, -100, 0, -60)
+    toast.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    toast.BackgroundTransparency = 0.1
+    toast.BorderSizePixel = 0
+    toast.Parent = alertGui
+
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(1, 0); c.Parent = toast
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(255, 80, 80); s.Thickness = 1.5; s.Transparency = 0.2; s.Parent = toast
+
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.fromOffset(30, 44)
+    icon.Position = UDim2.fromOffset(10, 0)
+    icon.BackgroundTransparency = 1
+    icon.Text = "⚠"; icon.TextSize = 22
+    icon.TextColor3 = Color3.fromRGB(255, 90, 90)
+    icon.Font = Enum.Font.GothamBold
+    icon.Parent = toast
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -50, 1, 0)
+    lbl.Position = UDim2.fromOffset(44, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "PLAYER DETECTADO!"
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextColor3 = Color3.fromRGB(255, 240, 240)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 13
+    lbl.Parent = toast
+
+    TweenService:Create(toast,
+        TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        { Position = UDim2.new(0.5, -100, 0, 20) }):Play()
+    pcall(function() alertSound:Play() end)
+
+    task.delay(2, function()
+        TweenService:Create(toast,
+            TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { Position = UDim2.new(0.5, -100, 0, -60) }):Play()
+        task.wait(0.5)
+        toast:Destroy()
+        alertActive = false
+    end)
+end
+
+local function removeESP(target)
+    local d = espObjects[target]
+    if d then
+        if d.hl then d.hl:Destroy() end
+        if d.bb then d.bb:Destroy() end
+        if d.dw then
+            if d.dw.line then d.dw.line:Remove() end
+            for _, l in ipairs(d.dw.box) do l:Remove() end
+        end
+        espObjects[target] = nil
+    end
+end
+
+local function addESP(target)
+    if not espEnabled or target == player then return end
+    local c = target.Character
+    local head = c and c:FindFirstChild("Head")
+    if not c or not head then return end
+    local ex = espObjects[target]
+    if ex and ex.character == c then return end
+    removeESP(target)
+
+    local hl = Instance.new("Highlight")
+    hl.Adornee = c
+    hl.FillTransparency = 0.65
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = c
+
+    local bb = Instance.new("BillboardGui")
+    bb.Adornee = head
+    bb.Size = UDim2.new(0, 180, 0, 30)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = head
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.fromScale(1, 1)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = target.DisplayName .. " (@" .. target.Name .. ")"
+    lbl.TextStrokeTransparency = 0
+    lbl.TextScaled = true
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Parent = bb
+
+    local dw = nil
+    if hasDrawing then
+        local line = Drawing.new("Line")
+        line.Thickness = 2; line.Transparency = 1; line.Visible = false
+        local box = {}
+        for _ = 1, 4 do
+            local l = Drawing.new("Line")
+            l.Thickness = 1.5; l.Transparency = 1; l.Visible = false
+            table.insert(box, l)
+        end
+        dw = { line = line, box = box }
+    end
+
+    espObjects[target] = { character = c, hl = hl, bb = bb, label = lbl, dw = dw }
+end
+
+local function refreshESP()
+    for _, t in ipairs(Players:GetPlayers()) do
+        if t ~= player then addESP(t) end
+    end
+end
+
+local function setESP(v)
+    espEnabled = v
+    if v then refreshESP()
+    else
+        local list = {}
+        for t in pairs(espObjects) do table.insert(list, t) end
+        for _, t in ipairs(list) do removeESP(t) end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not espEnabled then return end
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local hue = (os.clock() * ESP_RAINBOW_SPEED) % 1
+    local mc = Color3.fromHSV(hue, 1, 1)
+    local oc = Color3.fromHSV((hue + 0.5) % 1, 1, 1)
+    local anyClose = false
+
+    for _, d in pairs(espObjects) do
+        if d.hl and d.hl.Parent then
+            d.hl.FillColor = mc
+            d.hl.OutlineColor = oc
+        end
+        if d.label and d.label.Parent then d.label.TextColor3 = mc end
+
+        if d.dw and d.character and d.character.Parent then
+            local head = d.character:FindFirstChild("Head")
+            local hrp = d.character:FindFirstChild("HumanoidRootPart")
+            local hum = d.character:FindFirstChildOfClass("Humanoid")
+            local alive = hum and hum.Health > 0
+            if d.bb then d.bb.Enabled = alive end
+
+            if alive and head and hrp then
+                if myRoot and (hrp.Position - myRoot.Position).Magnitude <= ESP_DETECT_RANGE then
+                    anyClose = true
+                end
+                local hs, hon = cam:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local fs, fon = cam:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                local hv = hon and hs.Z > 0
+                local fv = fon and fs.Z > 0
+
+                if d.dw.line then
+                    if myRoot and hv then
+                        local ms, mon = cam:WorldToViewportPoint(myRoot.Position)
+                        if mon and ms.Z > 0 then
+                            d.dw.line.Visible = true
+                            d.dw.line.From = Vector2.new(ms.X, ms.Y)
+                            d.dw.line.To = Vector2.new(hs.X, hs.Y)
+                            d.dw.line.Color = mc
+                        else
+                            d.dw.line.Visible = false
+                        end
+                    else
+                        d.dw.line.Visible = false
+                    end
+                end
+
+                if hv and fv then
+                    local hh = math.clamp(math.abs(fs.Y - hs.Y), 20, 500)
+                    local ww = hh * 0.5
+                    local cx = hs.X
+                    local ty = math.min(hs.Y, fs.Y)
+                    local by = math.max(hs.Y, fs.Y)
+                    d.dw.box[1].From = Vector2.new(cx - ww/2, ty)
+                    d.dw.box[1].To   = Vector2.new(cx + ww/2, ty)
+                    d.dw.box[2].From = Vector2.new(cx - ww/2, by)
+                    d.dw.box[2].To   = Vector2.new(cx + ww/2, by)
+                    d.dw.box[3].From = Vector2.new(cx - ww/2, ty)
+                    d.dw.box[3].To   = Vector2.new(cx - ww/2, by)
+                    d.dw.box[4].From = Vector2.new(cx + ww/2, ty)
+                    d.dw.box[4].To   = Vector2.new(cx + ww/2, by)
+                    for _, l in ipairs(d.dw.box) do
+                        l.Visible = true
+                        l.Color = oc
+                    end
+                else
+                    for _, l in ipairs(d.dw.box) do l.Visible = false end
+                end
+            else
+                if d.dw.line then d.dw.line.Visible = false end
+                for _, l in ipairs(d.dw.box) do l.Visible = false end
+            end
+        end
+    end
+
+    if anyClose then showAlert() end
+end)
+
+local function watch(t)
+    if t == player then return end
+    t.CharacterAdded:Connect(function()
+        task.wait(1)
+        addESP(t)
+    end)
+end
+Players.PlayerAdded:Connect(watch)
+Players.PlayerRemoving:Connect(function(t) removeESP(t) end)
+for _, t in ipairs(Players:GetPlayers()) do watch(t) end
+
+--==================================================
+-- SPEED CARRY / NORMAL (lift 8 studs + anim zerada)
+--==================================================
+local function stopLift()
+    if liftConn then liftConn:Disconnect(); liftConn = nil end
+    if liftPad then liftPad:Destroy(); liftPad = nil end
+end
+
+local function applySpeedEffects()
+    if slowAnimConn then slowAnimConn:Disconnect(); slowAnimConn = nil end
+    stopLift()
+    if not speedMode then return end
+
+    slowAnimConn = RunService.Heartbeat:Connect(function()
+        local _, h = getCC()
+        local anim = h and h:FindFirstChildOfClass("Animator")
+        if not anim then return end
+        for _, tr in ipairs(anim:GetPlayingAnimationTracks()) do
+            local a = tr.Animation
+            if a then
+                local n = string.lower(tr.Name .. " " .. a.Name)
+                if string.find(n, "walk") or string.find(n, "run") or string.find(n, "idle") then
+                    tr:AdjustSpeed(0)
+                end
+            end
+        end
+    end)
+
+    task.spawn(function()
+        task.wait(0.1)
+        local _, h, root = getCC()
+        if not h or not root then return end
+        local baseY = root.Position.Y + LIFT_STUDS
+        root.CFrame = CFrame.new(root.Position.X, baseY, root.Position.Z)
+        task.wait(0.1)
+
+        liftPad = Instance.new("Part")
+        liftPad.Name = "XHubSpeedLift"
+        liftPad.Size = Vector3.new(6, 1, 6)
+        liftPad.Anchored = true
+        liftPad.CanCollide = true
+        liftPad.CanTouch = false
+        liftPad.CanQuery = false
+        liftPad.Transparency = 1
+        liftPad.CFrame = CFrame.new(root.Position - Vector3.new(0, 3.5, 0))
+        liftPad.Parent = workspace
+
+        liftConn = RunService.Heartbeat:Connect(function()
+            if not speedMode or not liftPad then return end
+            if auraEnabled then return end
+            local _, hh, rr = getCC()
+            if not hh or not rr or hh.Health <= 0 then return end
+            hh.WalkSpeed = speedMode
+            if rr.Position.Y < baseY - 1 then
+                liftPad.CFrame = CFrame.new(rr.Position.X, rr.Position.Y - 3.5, rr.Position.Z)
+            else
+                liftPad.CFrame = CFrame.new(rr.Position.X, baseY - 3.5, rr.Position.Z)
+            end
+        end)
+    end)
+end
+
+--==================================================
+-- AURA (persegue + olha + ativa Anti Reset junto)
+--==================================================
+local function getNearestPlayer()
+    local _, _, myRoot = getCC()
+    if not myRoot then return nil end
+    local nearest, shortest = nil, math.huge
+    for _, t in ipairs(Players:GetPlayers()) do
+        if t ~= player then
+            local c = t.Character
+            local h = c and c:FindFirstChildOfClass("Humanoid")
+            local r = c and c:FindFirstChild("HumanoidRootPart")
+            if h and r and h.Health > 0 then
+                local d = (r.Position - myRoot.Position).Magnitude
+                if d < shortest then shortest = d; nearest = t end
+            end
+        end
+    end
+    return nearest
+end
+
+local function stopAura()
+    auraEnabled = false
+    auraToken += 1
+    local _, h = getCC()
+    if h then
+        h:Move(Vector3.zero, false)
+        h.WalkSpeed = speedMode or currentSpeed or 16
+    end
+end
+
+local function startAura()
+    stopAura()
+    auraEnabled = true
+    auraToken += 1
+    local myToken = auraToken
+
+    task.spawn(function()
+        local lastAct = 0
+        while auraEnabled and auraToken == myToken do
+            local c, h, root = getCC()
+            if not c or not h or not root or h.Health <= 0 then
+                task.wait(0.1)
+                continue
+            end
+            h.WalkSpeed = AURA_SPEED
+            local target = getNearestPlayer()
+            local tc = target and target.Character
+            local th = tc and tc:FindFirstChildOfClass("Humanoid")
+            local tr = tc and tc:FindFirstChild("HumanoidRootPart")
+            if tr and th and th.Health > 0 then
+                local myPos = root.Position
+                local tPos = tr.Position
+                local flat = Vector3.new(tPos.X, myPos.Y, tPos.Z)
+                if (flat - myPos).Magnitude > 0.5 then
+                    local sv = root.AssemblyLinearVelocity
+                    root.CFrame = CFrame.lookAt(myPos, flat)
+                    root.AssemblyLinearVelocity = sv
+                end
+                local dest = tPos + tr.CFrame.LookVector * FOLLOW_DIST
+                local offset = dest - root.Position
+                local dist = offset.Magnitude
+                if dist > 1.5 then
+                    local dir = offset.Unit
+                    local tv = tr.AssemblyLinearVelocity
+                    local spd = math.max(AURA_SPEED, tv.Magnitude + 5)
+                    local nv = dir * spd
+                    local vd = tPos.Y - root.Position.Y
+                    if vd > 2 then
+                        nv = Vector3.new(nv.X, math.max(nv.Y, 25 + vd), nv.Z)
+                    elseif vd < -5 then
+                        nv = Vector3.new(nv.X, vd * 3, nv.Z)
+                    end
+                    root.AssemblyLinearVelocity = nv
+                elseif dist < 1 then
+                    local dir = -offset.Unit
+                    root.AssemblyLinearVelocity = Vector3.new(dir.X, 0, dir.Z) * 30
+                end
+                if os.clock() - lastAct >= BAT_INTERVAL then
+                    local bat = equipBat()
+                    if bat and bat.Parent == c then
+                        lastAct = os.clock()
+                        pcall(function() bat:Activate() end)
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+end
+--==================================================
+-- PARTE 3 — UI ARMENTA-LIB (4 ABAS)
+--==================================================
+
+--==================================================
+-- ABA 1: AUTO STEAL
+--==================================================
+local AutoStealTab = Menu:Tab({ Text = "Auto Steal", Icon = "hand-coins" })
+
+AutoStealTab:BoldLabel({
+    Text = "Steal a Brainrot",
+    Description = "Controles de auto steal, emote e noclip",
+})
+
+AutoStealTab:Button({
+    Text = "Abrir Painel Steal a Brainrot",
+    Description = "Emote + Deitar + Auto Steal com Noclip",
+    Icon = "gamepad-2",
+    Callback = function()
+        local api = getgenv().StealBrainrotPanel
+        if api and api.Open then
+            pcall(function() api:Open() end)
+        else
+            notify("X HUB", "Painel ainda não carregado!", "Warning")
+        end
+    end,
+})
+
+AutoStealTab:Divider()
+
+-- Auto Steal (ProximityPrompt global)
+local autoStealEnabled = false
+local autoStealToken = 0
+local heldPrompt = nil
+
+local function getPromptPosition(prompt)
+    local p = prompt.Parent
+    while p and p ~= workspace do
+        if p:IsA("Attachment") then return p.WorldPosition
+        elseif p:IsA("BasePart") then return p.Position
+        elseif p:IsA("Model") then return p:GetPivot().Position end
+        p = p.Parent
+    end
+    return nil
+end
+
+local function findNearestPrompt()
+    local c = player.Character
+    if not c then return nil end
+    local root = c:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    local nearest, shortest = nil, math.huge
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local pos = getPromptPosition(obj)
+            if pos then
+                local d = (root.Position - pos).Magnitude
+                if d <= obj.MaxActivationDistance and d < shortest then
+                    shortest = d; nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function releasePrompt()
+    local p = heldPrompt; heldPrompt = nil
+    if p then pcall(function() p:InputHoldEnd() end) end
+end
+
+local function autoInteraction(myToken)
+    while autoStealEnabled and autoStealToken == myToken do
+        local prompt = findNearestPrompt()
+        if prompt then
+            local ok = pcall(function()
+                heldPrompt = prompt
+                prompt:InputHoldBegin()
+            end)
+            if ok then
+                local hold = prompt.HoldDuration
+                local start = os.clock()
+                while autoStealEnabled and autoStealToken == myToken
+                and prompt.Parent and prompt.Enabled do
+                    local elapsed = os.clock() - start
+                    if elapsed >= hold + 0.3 then break end
+                    local c = player.Character
+                    local r = c and c:FindFirstChild("HumanoidRootPart")
+                    local p = getPromptPosition(prompt)
+                    if not r or not p then break end
+                    if (r.Position - p).Magnitude > prompt.MaxActivationDistance then break end
+                    task.wait(0.03)
+                end
+            end
+            releasePrompt()
+            task.wait(0.15)
+        else
+            task.wait(0.15)
+        end
+    end
+    releasePrompt()
+end
+
+local function startAutoSteal()
+    if autoStealEnabled then return end
+    autoStealEnabled = true
+    autoStealToken += 1
+    task.spawn(function() autoInteraction(autoStealToken) end)
+    notify("X HUB", "Auto Steal ON", "Success")
+end
+
+local function stopAutoSteal()
+    autoStealEnabled = false
+    autoStealToken += 1
+    releasePrompt()
+    notify("X HUB", "Auto Steal OFF", "Info")
+end
+
+AutoStealTab:Toggle({
+    Text = "Auto Steal (ProximityPrompt)",
+    Description = "Segura o prompt mais próximo",
+    Default = false,
+    Callback = function(v)
+        if v then startAutoSteal() else stopAutoSteal() end
+    end,
+})
+
+--==================================================
+-- ABA 2: PLAYER (Speed + Movimento + Aura)
+--==================================================
+local PlayerTab = Menu:Tab({ Text = "Player", Icon = "user" })
+
+PlayerTab:BoldLabel({ Text = "Speed", Description = "Levita 8 studs + animação zerada" })
+
+PlayerTab:Toggle({
+    Text = "Carry speed (29)",
+    Description = "Levita 8 studs + speed 29 + animação zerada",
+    Default = false,
+    Callback = function(v)
+        if v then
+            speedMode = CARRY_SPEED
+            setSpeed(CARRY_SPEED)
+            applySpeedEffects()
+        elseif speedMode == CARRY_SPEED then
+            speedMode = nil
+            setSpeed(nil)
+            applySpeedEffects()
+        end
+    end,
+})
+
+PlayerTab:Toggle({
+    Text = "Normal speed (59)",
+    Description = "Levita 8 studs + speed 59 + animação zerada",
+    Default = false,
+    Callback = function(v)
+        if v then
+            speedMode = NORMAL_SPEED
+            setSpeed(NORMAL_SPEED)
+            applySpeedEffects()
+        elseif speedMode == NORMAL_SPEED then
+            speedMode = nil
+            setSpeed(nil)
+            applySpeedEffects()
+        end
+    end,
+})
+
+PlayerTab:Button({
+    Text = "Restaurar Speed",
+    Icon = "rotate-ccw",
+    Callback = function()
+        speedMode = nil
+        setSpeed(nil)
+        applySpeedEffects()
+        notify("X HUB", "Speed restaurado", "Info")
+    end,
+})
+
+PlayerTab:Divider()
+PlayerTab:BoldLabel({ Text = "Movimento" })
+
+PlayerTab:Toggle({
+    Text = "Float",
+    Description = "Voa e desce rápido",
+    Default = false,
+    Callback = function(v)
+        floatEnabled = v
+        if floatConn then floatConn:Disconnect(); floatConn = nil end
+        if v then
+            floatConn = RunService.Heartbeat:Connect(function()
+                if not floatEnabled or speedMode or auraEnabled then return end
+                local _, h, root = getCC()
+                if not h or not root or h.Health <= 0 then return end
+                h.WalkSpeed = 28
+                if h.FloorMaterial == Enum.Material.Air then
+                    local vel = root.AssemblyLinearVelocity
+                    if vel.Y < 0 then
+                        root.AssemblyLinearVelocity = Vector3.new(vel.X, math.max(vel.Y - 4, -120), vel.Z)
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+PlayerTab:Toggle({
+    Text = "Inf Jump (5 studs)",
+    Description = "Pula 5 studs infinitamente",
+    Default = false,
+    Callback = function(v)
+        infiniteJumpEnabled = v
+        notify("X HUB", v and "Inf Jump ON" or "Inf Jump OFF", v and "Success" or "Info")
+    end,
+})
+
+UserInputService.JumpRequest:Connect(function()
+    if not infiniteJumpEnabled or jumpDebounce then return end
+    local _, h, root = getCC()
+    if not h or not root or h.Health <= 0 then return end
+    jumpDebounce = true
+    local jv = math.sqrt(2 * workspace.Gravity * JUMP_HEIGHT)
+    local vel = root.AssemblyLinearVelocity
+    root.AssemblyLinearVelocity = Vector3.new(vel.X, jv, vel.Z)
+    task.delay(0.15, function() jumpDebounce = false end)
+end)
+
+PlayerTab:Toggle({
+    Text = "Anti Ragdoll",
+    Description = "Não cai no chão",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if ragdollConn then ragdollConn:Disconnect(); ragdollConn = nil end
+            antiRagdollEnabled = true
+            ragdollWas = false
+            ragdollConn = RunService.Heartbeat:Connect(function()
+                if not antiRagdollEnabled then return end
+                local _, h, root = getCC()
+                if not h or not root or h.Health <= 0 then return end
+                local rg = h:GetState() == Enum.HumanoidStateType.Ragdoll
+                    or h:GetState() == Enum.HumanoidStateType.Physics
+                if rg and not ragdollWas then
+                    ragdollPos = root.CFrame
+                    ragdollAnchor = root
+                    ragdollWas = true
+                    root.CFrame = ragdollPos
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.AssemblyAngularVelocity = Vector3.zero
+                    root.Anchored = true
+                elseif rg and ragdollWas then
+                    if ragdollAnchor and ragdollAnchor.Parent then
+                        ragdollAnchor.CFrame = ragdollPos
+                        ragdollAnchor.AssemblyLinearVelocity = Vector3.zero
+                        ragdollAnchor.AssemblyAngularVelocity = Vector3.zero
+                        ragdollAnchor.Anchored = true
+                    end
+                elseif not rg and ragdollWas then
+                    if ragdollAnchor and ragdollAnchor.Parent then
+                        ragdollAnchor.Anchored = false
+                    end
+                    ragdollAnchor = nil
+                    ragdollPos = nil
+                    ragdollWas = false
+                end
+            end)
+        else
+            antiRagdollEnabled = false
+            if ragdollConn then ragdollConn:Disconnect(); ragdollConn = nil end
+            local c = getCC()
+            if c then
+                for _, i in ipairs(c:GetDescendants()) do
+                    if i:IsA("BasePart") and i.Name == "HumanoidRootPart" then
+                        i.Anchored = false
+                    end
+                end
+            end
+        end
+    end,
+})
+
+PlayerTab:Divider()
+PlayerTab:BoldLabel({ Text = "Bat / Aura" })
+
+PlayerTab:Toggle({
+    Text = "Auto Bat",
+    Description = "Equipa e ativa o Bat",
+    Default = false,
+    Callback = function(v)
+        autoBatEnabled = v
+        autoBatToken += 1
+        local myToken = autoBatToken
+        if v then
+            task.spawn(function()
+                while autoBatEnabled and autoBatToken == myToken do
+                    local c, h = getCC()
+                    local bat = getBat()
+                    if c and h and h.Health > 0 and bat then
+                        if bat.Parent ~= c then pcall(function() h:EquipTool(bat) end) end
+                        if bat.Parent == c then pcall(function() bat:Activate() end) end
+                    end
+                    task.wait(BAT_INTERVAL)
+                end
+            end)
+        end
+    end,
+})
+
+PlayerTab:Toggle({
+    Text = "Bat Aura",
+    Description = "Persegue + olha + ativa Anti Reset junto",
+    Default = false,
+    Callback = function(v)
+        if v and not auraEnabled then
+            startAura()
+            if not antiResetEnabled then
+                antiResetEnabled = true
+                applyResetBlock()
+                if antiResetConn then antiResetConn:Disconnect(); antiResetConn = nil end
+                antiResetConn = RunService.Heartbeat:Connect(function()
+                    if not antiResetEnabled then return end
+                    local _, h = getCC()
+                    if not h then return end
+                    pcall(function()
+                        h:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                    end)
+                    if h.Health <= 0 then h.Health = h.MaxHealth end
+                    if h:GetState() == Enum.HumanoidStateType.Dead then
+                        h:ChangeState(Enum.HumanoidStateType.Running)
+                    end
+                end)
+            end
+        elseif not v and auraEnabled then
+            stopAura()
+        end
+    end,
+})
+
+PlayerTab:Toggle({
+    Text = "ESP Player",
+    Description = "Linha + caixa + nome rainbow + alerta",
+    Default = false,
+    Callback = setESP,
+})
+--==================================================
+-- PARTE 4 — ANTI RESET + ANTI LAG + ABA 3 + ABA 4
+--==================================================
+
+--==================================================
+-- ANTI RESET (funções base)
+--==================================================
+function applyResetBlock()
+    if not antiResetEnabled then return end
+    pcall(function() StarterGui:SetCore("ResetButtonCallback", false) end)
+end
+
+--==================================================
+-- ANTI LAG
+--==================================================
+local antiLagBackup = { fov = 70, lighting = {}, particles = {} }
+
+local function applyAntiLag()
+    if antiLagEnabled then return end
+    antiLagEnabled = true
+
+    local cam = workspace.CurrentCamera
+    if cam then
+        antiLagBackup.fov = cam.FieldOfView
+        cam.FieldOfView = 90
+    end
+
+    -- Remove animações do player
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local anim = hum and hum:FindFirstChildOfClass("Animator")
+        if anim then
+            for _, track in ipairs(anim:GetPlayingAnimationTracks()) do
+                pcall(function() track:Stop() end)
+            end
+        end
+    end
+
+    if antiLagBackup.animConn then antiLagBackup.animConn:Disconnect() end
+    antiLagBackup.animConn = RunService.Heartbeat:Connect(function()
+        if not antiLagEnabled then return end
+        local _, h = getCC()
+        local anim = h and h:FindFirstChildOfClass("Animator")
+        if not anim then return end
+        for _, tr in ipairs(anim:GetPlayingAnimationTracks()) do
+            local a = tr.Animation
+            if a then
+                local n = string.lower(tr.Name .. " " .. a.Name)
+                if string.find(n, "walk") or string.find(n, "run")
+                or string.find(n, "idle") or string.find(n, "jump")
+                or string.find(n, "fall") or string.find(n, "climb") then
+                    tr:AdjustSpeed(0)
+                end
+            end
+        end
+    end)
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ParticleEmitter") or obj:IsA("Fire")
+        or obj:IsA("Smoke") or obj:IsA("Sparkles")
+        or obj:IsA("Trail") or obj:IsA("Beam") then
+            pcall(function()
+                if obj.Enabled then
+                    table.insert(antiLagBackup.particles, obj)
+                    obj.Enabled = false
+                end
+            end)
+        end
+    end
+
+    for _, l in ipairs(Lighting:GetChildren()) do
+        if l:IsA("PostEffect") or l:IsA("Atmosphere")
+        or l:IsA("BloomEffect") or l:IsA("BlurEffect")
+        or l:IsA("SunRaysEffect") or l:IsA("ColorCorrectionEffect")
+        or l:IsA("DepthOfFieldEffect") then
+            pcall(function()
+                if l.Enabled then
+                    antiLagBackup.lighting[l] = true
+                    l.Enabled = false
+                end
+            end)
+        end
+    end
+
+    notify("X HUB", "Anti Lag ON", "Success")
+end
+
+local function removeAntiLag()
+    if not antiLagEnabled then return end
+    antiLagEnabled = false
+
+    local cam = workspace.CurrentCamera
+    if cam then cam.FieldOfView = antiLagBackup.fov end
+
+    if antiLagBackup.animConn then
+        antiLagBackup.animConn:Disconnect()
+        antiLagBackup.animConn = nil
+    end
+
+    for _, obj in ipairs(antiLagBackup.particles) do
+        pcall(function()
+            if obj and obj.Parent then obj.Enabled = true end
+        end)
+    end
+    table.clear(antiLagBackup.particles)
+
+    for effect in pairs(antiLagBackup.lighting) do
+        pcall(function()
+            if effect and effect.Parent then effect.Enabled = true end
+        end)
+    end
+    table.clear(antiLagBackup.lighting)
+
+    notify("X HUB", "Anti Lag OFF", "Info")
+end
+
+--==================================================
+-- ABA 3: MÚSICA + DISCORD
+--==================================================
+local MusicTab = Menu:Tab({ Text = "Música", Icon = "music" })
+
+MusicTab:BoldLabel({
+    Text = "X HUB Music",
+    Description = "Sons e comunidade",
+})
+
+MusicTab:Input({
+    Text = "ID da Música",
+    Description = "Cole o ID do áudio (ex: 97825347303470)",
+    Placeholder = "97825347303470",
+    Numeric = true,
+    Flag = "MusicIdInput",
+})
+
+local musicSound = nil
+MusicTab:Button({
+    Text = "Tocar Música (30s)",
+    Description = "Toca a música do ID acima por 30 segundos",
+    Icon = "play",
+    Callback = function()
+        local flag = Menu and Menu.Flags and Menu.Flags["MusicIdInput"]
+        local id = (flag and tostring(flag)) or "97825347303470"
+        if musicSound and musicSound.Parent then musicSound:Destroy() end
+        musicSound = Instance.new("Sound")
+        musicSound.SoundId = "rbxassetid://" .. id
+        musicSound.Volume = 0.5
+        musicSound.Parent = SoundService
+        musicSound:Play()
+        notify("X HUB", "Música tocando (30s): " .. id, "Success")
+        task.delay(30, function()
+            if musicSound and musicSound.Parent then
+                musicSound:Destroy(); musicSound = nil
+                notify("X HUB", "Música finalizada", "Info")
+            end
+        end)
+    end,
+})
+
+MusicTab:Button({
+    Text = "Parar Música",
+    Icon = "square",
+    Callback = function()
+        if musicSound and musicSound.Parent then
+            musicSound:Destroy(); musicSound = nil
+            notify("X HUB", "Música parada", "Info")
+        end
+    end,
+})
+
+MusicTab:Divider()
+MusicTab:BoldLabel({ Text = "Discord" })
+MusicTab:Label({ Text = "<b>Discord:</b> " .. DISCORD_URL })
+
+MusicTab:Button({
+    Text = "Copiar Discord",
+    Description = "Copia o link do Discord",
+    Icon = "copy",
+    Callback = function()
+        if typeof(setclipboard) == "function" then
+            if pcall(function() setclipboard(DISCORD_URL) end) then
+                notify("X HUB", "Discord copiado!", "Success")
+                return
+            end
+        end
+        notify("X HUB", DISCORD_URL, "Info")
+    end,
+})
+
+--==================================================
+-- ABA 4: PVP PANEL
+--==================================================
+local PvPTab = Menu:Tab({ Text = "PvP Panel", Icon = "swords" })
+
+PvPTab:BoldLabel({
+    Text = "Painel PvP Mobile",
+    Description = "Botões rápidos sobre a tela",
+})
+
+local pvpPanelVisible = false
+
+PvPTab:Toggle({
+    Text = "Mostrar Painel PvP",
+    Description = "Abre o painel mobile com botões rápidos",
+    Default = false,
+    Callback = function(v)
+        pvpPanelVisible = v
+        local api = getgenv().XHubPvPPanel
+        if api and api.SetVisible then
+            pcall(function() api:SetVisible(v) end)
+        end
+    end,
+})
+
+PvPTab:Button({
+    Text = "Abrir Painel PvP",
+    Description = "Abre o painel PvP flutuante",
+    Icon = "layout-grid",
+    Callback = function()
+        local api = getgenv().XHubPvPPanel
+        if api and api.SetVisible then
+            pcall(function() api:SetVisible(true) end)
+            pvpPanelVisible = true
+        end
+    end,
+})
+
+PvPTab:Button({
+    Text = "Fechar Painel PvP",
+    Icon = "x",
+    Callback = function()
+        local api = getgenv().XHubPvPPanel
+        if api and api.SetVisible then
+            pcall(function() api:SetVisible(false) end)
+            pvpPanelVisible = false
+        end
+    end,
+})
+
+PvPTab:Divider()
+PvPTab:BoldLabel({ Text = "Anti Reset / Anti Lag" })
+
+PvPTab:Toggle({
+    Text = "Anti Reset",
+    Description = "HP vai a 0 mas você não morre",
+    Default = false,
+    Callback = function(v)
+        antiResetEnabled = v
+        if v then
+            applyResetBlock()
+            if antiResetConn then antiResetConn:Disconnect(); antiResetConn = nil end
+            antiResetConn = RunService.Heartbeat:Connect(function()
+                if not antiResetEnabled then return end
+                local _, h = getCC()
+                if not h then return end
+                pcall(function()
+                    h:SetStateEnabled(Enum.HumanoidStateType.Dead, false)
+                end)
+                if h.Health <= 0 then h.Health = h.MaxHealth end
+                if h:GetState() == Enum.HumanoidStateType.Dead then
+                    h:ChangeState(Enum.HumanoidStateType.Running)
+                end
+            end)
+            task.spawn(function()
+                for _ = 1, 30 do
+                    if not antiResetEnabled then break end
+                    applyResetBlock()
+                    task.wait(1)
+                end
+            end)
+            notify("X HUB", "Anti Reset ON", "Success")
+        else
+            if antiResetConn then antiResetConn:Disconnect(); antiResetConn = nil end
+            local _, h = getCC()
+            if h then pcall(function() h:SetStateEnabled(Enum.HumanoidStateType.Dead, true) end) end
+            pcall(function() StarterGui:SetCore("ResetButtonCallback", true) end)
+            notify("X HUB", "Anti Reset OFF", "Info")
+        end
+    end,
+})
+
+PvPTab:Toggle({
+    Text = "Anti Lag",
+    Description = "Remove anim + partículas + estica tela",
+    Default = false,
+    Callback = function(v)
+        if v then applyAntiLag() else removeAntiLag() end
+    end,
+})
+
+--==================================================
+-- CHARACTER ADDED (reset geral)
+--==================================================
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    local _, h = getCC()
+    if h and currentSpeed and not auraEnabled then
+        h.WalkSpeed = currentSpeed
+    end
+    if speedMode then applySpeedEffects() end
+    if antiResetEnabled then applyResetBlock() end
+    if espEnabled then refreshESP() end
+    if auraEnabled then stopAura() end
+end)
+
+notify("X HUB Mobile", "Menu Armenta carregado!", "Success")
